@@ -1,6 +1,6 @@
 // Guarda a app no telemóvel para abrir sem internet.
 // Ao publicar uma nova versão, muda o número abaixo.
-const VERSION = "folha-horas-v1";
+const VERSION = "folha-horas-v2";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icons/icon.svg", "./icons/icon-192.png", "./icons/apple-touch-icon.png"];
 
 self.addEventListener("install", e => {

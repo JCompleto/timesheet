@@ -76,7 +76,8 @@ textarea.field{min-height:88px;resize:vertical;line-height:1.45}
 .hours button span:last-child{font-size:13px;color:var(--muted)}
 .hours button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
 .hours button[aria-pressed="true"] span:last-child{color:var(--on-accent);font-weight:500}
-.datebtn{position:relative;display:flex;align-items:center;gap:8px;height:40px;padding:0 14px;border-radius:99px;background:var(--surface);border:1px solid var(--line);font-size:14px;font-weight:500}
+.daynav{display:flex;align-items:center;gap:6px}
+.datebtn{position:relative;display:flex;align-items:center;gap:8px;height:40px;padding:0 12px;border-radius:99px;background:var(--surface);border:1px solid var(--line);font-size:14px;font-weight:500}
 .datebtn input{position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer}
 
 /* Folha */
@@ -262,7 +263,7 @@ function viewReg(){
   return `
   <div class="row">
     <div style="display:flex;flex-direction:column;gap:4px;min-width:0">
-      <span class="muted" style="font-size:14px">${ui.editId ? "Editar registo" : "Olá, João"}</span>
+      <span style="font-size:15px;font-weight:500;color:var(--fg-2)">${ui.editId ? "Editar registo" : "Olá, João"}</span>
       <h1>${isToday?"Hoje, ":""}${DOW[d.getDay()]}, ${d.getDate()} ${MON[d.getMonth()].slice(0,3)}</h1>
     </div>
     <button class="iconbtn" id="goCfg" aria-label="Clientes e projetos">${I.sliders}</button>
@@ -271,12 +272,16 @@ function viewReg(){
   ${hasSample() && !ui.editId ? `<div class="banner"><span>Os clientes e registos que vês são exemplos.</span><button class="linkbtn" data-act="clearSample">Apagar exemplos</button></div>` : ""}
 
   <div class="card" style="padding:16px 18px;display:flex;flex-direction:column;gap:10px">
-    <div class="row">
-      <label class="datebtn">${I.cal}<span>Mudar dia</span><input type="date" id="fDate" value="${f.date}" aria-label="Data do registo"></label>
+    <div class="row" style="flex-wrap:wrap">
+      <div class="daynav">
+        <button class="iconbtn sm" data-dstep="-1" aria-label="Dia anterior">${I.chevL}</button>
+        <label class="datebtn">${I.cal}<span>Mudar dia</span><input type="date" id="fDate" value="${f.date}" aria-label="Data do registo"></label>
+        <button class="iconbtn sm" data-dstep="1" aria-label="Dia seguinte">${I.chevR}</button>
+      </div>
       <span class="num" style="font-size:22px">${fmtH(logged)} <span class="muted" style="font-size:14px;font-weight:600">/ 8h</span></span>
     </div>
     <div class="progress" aria-hidden="true"><i style="width:${Math.min(100,logged/8*100)}%;${logged>8?"background:var(--half)":""}"></i></div>
-    ${hol?`<span class="muted" style="font-size:13px">Feriado: ${esc(hol)}</span>`:""}
+    ${hol||!isToday?`<div class="row" style="flex-wrap:wrap"><span class="muted" style="font-size:13px">${hol?`Feriado: ${esc(hol)}`:""}</span>${!isToday?`<button class="linkbtn" id="goToday" style="padding:2px 0">Voltar a hoje</button>`:""}</div>`:""}
   </div>
 
   <div style="display:flex;flex-direction:column;gap:10px">
@@ -310,6 +315,8 @@ function bindReg(){
   const f = ui.form;
   $("#goCfg").onclick = () => go("cfg");
   $("#fDate").onchange = e => { if(e.target.value){ f.date = e.target.value; render(); } };
+  document.querySelectorAll("[data-dstep]").forEach(b => b.onclick = () => { f.date = iso(addDays(parse(f.date), Number(b.dataset.dstep))); render(); });
+  const gt = $("#goToday"); if(gt) gt.onclick = () => { f.date = today(); render(); };
   $("#fDesc").oninput = e => f.desc = e.target.value;
   document.querySelectorAll(".hours button").forEach(b => b.onclick = () => { f.hours = Number(b.dataset.h); document.querySelectorAll(".hours button").forEach(x=>x.setAttribute("aria-pressed", x===b)); });
   $("#openPicker").onclick = openPicker;

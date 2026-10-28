@@ -1,0 +1,643 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Folha de Horas</title>
+<meta name="description" content="Registo diário de horas por cliente e projeto.">
+<meta name="theme-color" content="#0B0D12">
+<meta name="color-scheme" content="dark">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Horas">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700&family=Onest:wght@400;500;600&display=swap">
+<style>
+/* Layout: app de telemóvel numa coluna, navegação flutuante em baixo, lista de escolha que sobe de baixo. Tema escuro único, por escolha. */
+:root{
+  color-scheme:dark;
+  --bg:#0B0D12; --surface:#151922; --surface-2:#1D2230; --line:#262C3A; --line-soft:#1D2230;
+  --fg:#F2F4F8; --fg-2:#D5DAE3; --muted:#8C95A6; --dim:#6B7385;
+  --accent:#6D93FF; --accent-soft:#1E2A4D; --accent-text:#9DB6FF; --on-accent:#0B0D12;
+  --half:#F5B14C; --half-soft:#3A2D14; --danger:#FF8A7A; --dash:#3A4357;
+  --display:"Sora",ui-sans-serif,system-ui,sans-serif;
+  --body:"Onest",ui-sans-serif,system-ui,sans-serif;
+  --nav-h:64px;
+}
+*{box-sizing:border-box}
+html,body{background:var(--bg)}
+body{color:var(--fg);font:15px/1.45 var(--body);margin:0;-webkit-tap-highlight-color:transparent}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+button,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.wrap{max-width:480px;margin:0 auto;padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px));padding-block:calc(20px + env(safe-area-inset-top,0px)) calc(var(--nav-h) + 40px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:18px}
+h1,h2{font-family:var(--display);margin:0;letter-spacing:-.02em;text-wrap:balance}
+h1{font-size:26px}
+h2{font-size:20px}
+.num{font-family:var(--display);font-weight:700;font-variant-numeric:tabular-nums}
+.lbl{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.muted{color:var(--muted)}
+.row{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;display:inline-block}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:22px}
+.iconbtn{width:46px;height:46px;border-radius:50%;background:var(--surface);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.iconbtn.sm{width:40px;height:40px;background:var(--surface-2);border:0}
+svg{flex-shrink:0}
+.btn{height:56px;border-radius:18px;border:0;background:var(--fg);color:var(--bg);font-size:16px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px;width:100%}
+.btn.ghost{background:var(--surface);color:var(--fg);border:1px solid var(--line)}
+.btn.danger{background:transparent;color:var(--danger);border:1px solid var(--danger)}
+.btn.sm{height:44px;border-radius:14px;font-size:15px;width:auto;padding:0 16px}
+.linkbtn{background:none;border:0;color:var(--accent-text);font-weight:600;padding:8px 0}
+.pill{height:36px;padding:0 14px;border-radius:99px;background:var(--surface-2);border:0;font-size:14px;font-weight:500;display:inline-flex;align-items:center;gap:6px;max-width:100%}
+.pill.add{background:transparent;border:1px dashed var(--dash);color:var(--accent-text);font-weight:600}
+.pill.arch{background:transparent;border:1px dashed var(--line);color:var(--muted)}
+.field{width:100%;min-width:0;border-radius:16px;border:1px solid var(--line);background:var(--surface);padding:13px 16px;font-size:16px;color:var(--fg)}
+textarea.field{min-height:88px;resize:vertical;line-height:1.45}
+.err{color:var(--danger);font-size:14px}
+.banner{background:var(--accent-soft);border-radius:18px;padding:12px 14px;display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;font-size:14px}
+
+/* Registar */
+.progress{height:8px;border-radius:99px;background:var(--surface-2);overflow:hidden}
+.progress i{display:block;height:100%;border-radius:99px;background:var(--accent);transition:width .25s}
+.picker{display:flex;align-items:center;gap:14px;padding:14px 16px;width:100%;text-align:left;border-radius:20px}
+.avatar{width:44px;height:44px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-family:var(--display);font-size:16px;font-weight:700;flex-shrink:0}
+.picker .txt{flex-grow:1;display:flex;flex-direction:column;gap:2px;min-width:0}
+.picker .t1{font-size:16px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.picker .t2{font-size:14px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hours{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.hours button{height:84px;border-radius:20px;border:1px solid var(--line);background:var(--surface);display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;padding:0 18px}
+.hours button .num{font-size:28px}
+.hours button span:last-child{font-size:13px;color:var(--muted)}
+.hours button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.hours button[aria-pressed="true"] span:last-child{color:var(--on-accent);font-weight:500}
+.datebtn{position:relative;display:flex;align-items:center;gap:8px;height:40px;padding:0 14px;border-radius:99px;background:var(--surface);border:1px solid var(--line);font-size:14px;font-weight:500}
+.datebtn input{position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer}
+
+/* Folha */
+.seg{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;padding:4px;border-radius:99px;background:var(--surface);border:1px solid var(--line);width:132px}
+.seg button{height:34px;border-radius:99px;border:0;background:transparent;color:var(--muted);font-size:14px;font-weight:600}
+.seg button[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
+.week{display:grid;grid-template-columns:32px repeat(5,minmax(0,1fr)) 32px;gap:6px;align-items:center}
+.week .nav{width:32px;height:32px;border-radius:50%;border:0;background:transparent;color:var(--muted);display:flex;align-items:center;justify-content:center;padding:0}
+.wd{height:76px;border-radius:20px;border:1px solid var(--line-soft);background:transparent;color:var(--muted);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:0}
+.wd.has{border-color:var(--line);background:var(--surface);color:var(--fg)}
+.wd .d{font-size:12px}
+.wd .num{font-size:18px}
+.wd .bar{width:22px;height:4px;border-radius:99px;background:var(--line);overflow:hidden;display:block}
+.wd .bar i{display:block;height:100%;background:var(--accent)}
+.wd[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.wd[aria-pressed="true"] .bar{background:rgba(11,13,18,.25)}
+.wd[aria-pressed="true"] .bar i{background:var(--on-accent)}
+.wd.hol .d::after{content:" · fer.";}
+.big{font-size:44px;letter-spacing:-.03em;line-height:1.05}
+.entry{width:100%;text-align:left;padding:16px 18px;display:flex;flex-direction:column;gap:8px}
+.entry .who{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:600;min-width:0}
+.entry .who span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hpill{height:28px;padding:0 12px;border-radius:99px;background:var(--surface-2);font-size:14px;display:flex;align-items:center;flex-shrink:0}
+.hpill.half{background:var(--half-soft);color:var(--half)}
+.entry .proj{font-size:13px;color:var(--muted);font-weight:500}
+.entry .desc{font-size:15px;color:var(--fg-2);overflow-wrap:anywhere;white-space:pre-line}
+.empty{text-align:center;color:var(--muted);padding:28px 16px;display:flex;flex-direction:column;gap:12px;align-items:center}
+.cal-card{padding:16px 14px 18px;display:flex;flex-direction:column;gap:14px;border-radius:24px}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+.cal .h{text-align:center;font-size:11px;font-weight:600;color:var(--muted)}
+.cd{height:48px;border-radius:14px;border:1px solid transparent;background:transparent;color:var(--fg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:0}
+.cd .num{font-size:14px}
+.cd small{font-size:10px;font-weight:600;line-height:1.1}
+.cd.work{border-color:var(--line-soft);color:var(--muted)}
+.cd.weekend{color:var(--dim)}
+.cd.full{background:var(--accent-soft)}
+.cd.full small{color:var(--accent-text)}
+.cd.half{background:var(--half-soft)}
+.cd.half small{color:var(--half)}
+.cd.hol{border-color:var(--line-soft);color:var(--muted)}
+.cd.today{border-color:var(--accent)}
+.split{height:10px;border-radius:99px;display:flex;gap:3px;overflow:hidden}
+.split i{display:block;height:100%;border-radius:99px}
+
+/* Configurar */
+.cl{padding:18px;display:flex;flex-direction:column;gap:14px;border-radius:24px}
+.cl .name{display:flex;align-items:center;gap:10px;font-size:17px;font-weight:600;min-width:0;overflow-wrap:anywhere}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.inline{display:flex;flex-direction:column;gap:10px}
+.inline .acts{display:flex;gap:8px;flex-wrap:wrap}
+.colors{display:flex;gap:8px;flex-wrap:wrap}
+.colors button{width:32px;height:32px;border-radius:50%;border:2px solid transparent;padding:0}
+.colors button[aria-pressed="true"]{border-color:var(--fg)}
+textarea.copyout{width:100%;min-height:140px;font:13px/1.4 ui-monospace,Menlo,monospace;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px;color:var(--fg)}
+
+/* Navegação */
+nav.bottom{position:fixed;left:0;right:0;bottom:0;padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px));padding-bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:5;pointer-events:none;display:flex;justify-content:center}
+nav.bottom .in{pointer-events:auto;max-width:440px;width:100%;height:var(--nav-h);border-radius:24px;background:var(--surface);border:1px solid var(--line);display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;padding:6px;box-shadow:0 10px 30px rgba(0,0,0,.45)}
+nav.bottom button{border-radius:18px;border:0;background:transparent;color:var(--muted);display:flex;align-items:center;justify-content:center;gap:8px;font-size:14px;font-weight:600}
+nav.bottom button[aria-current="page"]{background:var(--accent-soft);color:var(--accent-text)}
+
+/* Lista que sobe de baixo */
+.sheet-bg{position:fixed;inset:0;background:rgba(3,4,8,.72);z-index:20;display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--surface);border-top:1px solid var(--line);width:100%;max-width:480px;max-height:88%;border-radius:28px 28px 0 0;display:flex;flex-direction:column;gap:14px;padding-top:10px;padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px));padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))}
+.handle{align-self:center;width:40px;height:5px;border-radius:99px;background:var(--dash)}
+.search{height:48px;border-radius:16px;background:var(--surface-2);display:flex;align-items:center;gap:10px;padding:0 14px;color:var(--muted)}
+.search input{flex-grow:1;min-width:0;border:0;background:transparent;color:var(--fg);font-size:16px;outline:none}
+.sheet .scroll{overflow-y:auto;display:flex;flex-direction:column;gap:12px;min-height:0;flex:1 1 auto;margin-right:-8px;padding-right:8px}
+.recents{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.recents button{border-radius:16px;border:1px solid var(--line);background:var(--surface-2);text-align:left;padding:12px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.recents .c{display:flex;align-items:center;gap:6px;font-size:12px;color:#B4BCCA;min-width:0}
+.recents .c span:last-child,.recents .p{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.recents .p{font-size:15px;font-weight:600}
+.group .gh{display:flex;align-items:center;gap:10px;font-size:13px;font-weight:600;color:#B4BCCA;padding:8px 4px}
+.group button{width:100%;min-height:52px;border:0;border-top:1px solid var(--line-soft);background:transparent;text-align:left;padding:0 4px 0 24px;display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:15px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--nav-h) + 30px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:11px 18px;border-radius:14px;font-size:14px;font-weight:500;z-index:30;max-width:calc(100% - 40px);text-align:center}
+@media (prefers-reduced-motion:no-preference){.sheet{animation:up .2s ease-out}@keyframes up{from{transform:translateY(30px);opacity:.5}}}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+
+<nav class="bottom" id="nav"><div class="in">
+  <button id="navReg"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Registar</button>
+  <button id="navFolha"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="4" y="5" width="16" height="16" rx="3"/><path d="M8 3v4M16 3v4M4 10h16"/></svg>Folha de horas</button>
+</div></nav>
+
+<div id="sheetHost"></div>
+<div class="toast" id="toast" role="status" hidden></div>
+<input type="file" id="importFile" accept=".json,application/json" hidden>
+
+<script>
+(() => {
+const KEY = "folha-horas-v2";
+const COLORS = ["#6D93FF","#4FD1C5","#F5B14C","#E58FD0","#9B8CFF","#7BD88F","#FF8A7A","#5CC8FF"];
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+const pad = n => String(n).padStart(2,"0");
+const iso = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const parse = s => { const [y,m,d] = s.split("-").map(Number); return new Date(y,m-1,d); };
+const addDays = (d,n) => { const x = new Date(d); x.setDate(x.getDate()+n); return x; };
+const today = () => iso(new Date());
+const fmtH = h => (Number.isInteger(h) ? h : h.toLocaleString("pt-PT")) + "h";
+const DOW = ["Domingo","Segunda","Terça","Quarta","Quinta","Sexta","Sábado"];
+const DOWS = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
+const MON = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
+const cap = s => s[0].toUpperCase() + s.slice(1);
+const weekMon = d => { const x = parse(iso(d)); return addDays(x, -((x.getDay()+6)%7)); };
+const initials = n => n.split(/\s+/).filter(w => w.length>2 || /^[A-Z]/.test(w)).slice(0,2).map(w=>w[0]).join("").toUpperCase() || n.slice(0,2).toUpperCase();
+
+const I = {
+  check:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L19 7"/></svg>',
+  chevR:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg>',
+  chevL:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>',
+  search:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>',
+  sliders:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>',
+  copy:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8"/></svg>',
+  pen:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>',
+  cal:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="4" y="5" width="16" height="16" rx="3"/><path d="M8 3v4M16 3v4M4 10h16"/></svg>',
+  plus:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>'
+};
+
+/* ---------- Feriados nacionais (Portugal) ---------- */
+const holCache = {};
+function holidays(y){
+  if (holCache[y]) return holCache[y];
+  const a=y%19,b=Math.floor(y/100),c=y%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451);
+  const mo=Math.floor((h+l-7*m+114)/31), da=((h+l-7*m+114)%31)+1, easter=new Date(y,mo-1,da);
+  const map = {};
+  [["01-01","Ano Novo"],["04-25","Dia da Liberdade"],["05-01","Dia do Trabalhador"],["06-10","Dia de Portugal"],["08-15","Assunção de Nossa Senhora"],["10-05","Implantação da República"],["11-01","Todos os Santos"],["12-01","Restauração da Independência"],["12-08","Imaculada Conceição"],["12-25","Natal"]].forEach(([md,n])=>map[`${y}-${md}`]=n);
+  map[iso(addDays(easter,-2))]="Sexta-feira Santa"; map[iso(easter)]="Páscoa"; map[iso(addDays(easter,60))]="Corpo de Deus";
+  return holCache[y]=map;
+}
+const holidayName = s => holidays(Number(s.slice(0,4)))[s];
+
+/* ---------- Dados ---------- */
+function sample(){
+  const c1={id:uid(),name:"Atlântico Seguros",color:COLORS[0],archived:false,sample:true,projects:[{id:uid(),name:"Migração S/4HANA",archived:false},{id:uid(),name:"Suporte AMS",archived:false}]};
+  const c2={id:uid(),name:"Banco Ribeira",color:COLORS[1],archived:false,sample:true,projects:[{id:uid(),name:"Roll-out FI/CO",archived:false}]};
+  const t=new Date(), entries=[];
+  const E=(d,c,p,h,desc)=>entries.push({id:uid(),date:iso(d),clientId:c.id,projectId:p.id,hours:h,desc,sample:true,ts:Date.now()});
+  let n=0;
+  for(let k=1;k<=12 && n<8;k++){ const d=addDays(t,-k); if(d.getDay()===0||d.getDay()===6||holidayName(iso(d))) continue; n++;
+    if(n%3===0){ E(d,c1,c1.projects[0],4,"Testes unitários dos relatórios ALV"); E(d,c1,c1.projects[1],4,"Análise de tickets de suporte"); }
+    else if(n%4===0) E(d,c2,c2.projects[0],8,"Configuração de centros de custo");
+    else E(d,c1,c1.projects[0],8,"Desenvolvimento e revisão de programas ABAP");
+  }
+  return {clients:[c1,c2], entries, last:{clientId:c1.id, projectId:c1.projects[0].id}};
+}
+function load(){
+  try { const r = localStorage.getItem(KEY); if (r) { const s = JSON.parse(r); if (s && Array.isArray(s.clients) && Array.isArray(s.entries)) return {last:null,...s}; } } catch(_) {}
+  return sample();
+}
+let S = load();
+function save(){
+  try { localStorage.setItem(KEY, JSON.stringify(S)); }
+  catch(_) { toast("Não foi possível guardar neste telemóvel. Faz uma cópia de segurança em Configurar."); }
+}
+const client = id => S.clients.find(c=>c.id===id);
+const project = (c,pid) => c?.projects.find(p=>p.id===pid);
+const dayEntries = d => S.entries.filter(e=>e.date===d).sort((a,b)=>(a.ts||0)-(b.ts||0));
+const dayHours = d => S.entries.reduce((s,e)=>e.date===d?s+e.hours:s,0);
+const hasSample = () => S.clients.some(c=>c.sample) || S.entries.some(e=>e.sample);
+
+/* ---------- Estado da interface ---------- */
+const ui = { view:"reg", folha:"dia", day:today(), month:today().slice(0,7), form:null, editId:null, cfg:{} };
+function newForm(date){
+  const l = S.last && client(S.last.clientId) && !client(S.last.clientId).archived && project(client(S.last.clientId), S.last.projectId) && !project(client(S.last.clientId), S.last.projectId).archived ? S.last : null;
+  return {date: date||today(), clientId:l?.clientId||null, projectId:l?.projectId||null, desc:"", hours:8, err:""};
+}
+ui.form = newForm();
+
+let toastT;
+function toast(m){ const t=$("#toast"); t.textContent=m; t.hidden=false; clearTimeout(toastT); toastT=setTimeout(()=>t.hidden=true,2600); }
+
+/* ---------- Registar ---------- */
+function viewReg(){
+  const f = ui.form, d = parse(f.date), isToday = f.date===today();
+  const c = client(f.clientId), p = project(c,f.projectId);
+  const logged = dayHours(f.date) - (ui.editId ? (S.entries.find(e=>e.id===ui.editId)?.hours||0) : 0);
+  const hol = holidayName(f.date);
+  return `
+  <div class="row">
+    <div style="display:flex;flex-direction:column;gap:4px;min-width:0">
+      <span class="muted" style="font-size:14px">${ui.editId ? "Editar registo" : "Olá, João"}</span>
+      <h1>${isToday?"Hoje, ":""}${DOW[d.getDay()]}, ${d.getDate()} ${MON[d.getMonth()].slice(0,3)}</h1>
+    </div>
+    <button class="iconbtn" id="goCfg" aria-label="Clientes e projetos">${I.sliders}</button>
+  </div>
+
+  ${hasSample() && !ui.editId ? `<div class="banner"><span>Os clientes e registos que vês são exemplos.</span><button class="linkbtn" data-act="clearSample">Apagar exemplos</button></div>` : ""}
+
+  <div class="card" style="padding:16px 18px;display:flex;flex-direction:column;gap:10px">
+    <div class="row">
+      <label class="datebtn">${I.cal}<span>Mudar dia</span><input type="date" id="fDate" value="${f.date}" aria-label="Data do registo"></label>
+      <span class="num" style="font-size:22px">${fmtH(logged)} <span class="muted" style="font-size:14px;font-weight:600">/ 8h</span></span>
+    </div>
+    <div class="progress" aria-hidden="true"><i style="width:${Math.min(100,logged/8*100)}%;${logged>8?"background:var(--half)":""}"></i></div>
+    ${hol?`<span class="muted" style="font-size:13px">Feriado: ${esc(hol)}</span>`:""}
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <div class="row"><span class="lbl">Cliente e projeto</span>${c&&!ui.editId&&S.last&&S.last.projectId===f.projectId?`<span class="muted" style="font-size:12px">O último que usaste</span>`:""}</div>
+    <button class="card picker" id="openPicker">
+      ${c ? `<span class="avatar" style="background:${c.color}22;color:${c.color}">${esc(initials(c.name))}</span>
+        <span class="txt"><span class="t1">${esc(c.name)}</span><span class="t2">${esc(p?.name||"Escolhe o projeto")}</span></span>`
+      : `<span class="avatar" style="background:var(--surface-2);color:var(--muted)">?</span>
+        <span class="txt"><span class="t1">Escolher cliente e projeto</span><span class="t2">${S.clients.some(x=>!x.archived)?"Toca para escolher":"Ainda não tens clientes"}</span></span>`}
+      <span class="muted">${I.chevR}</span>
+    </button>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <label class="lbl" for="fDesc">Descrição</label>
+    <textarea class="field" id="fDesc" placeholder="O que fizeste neste dia">${esc(f.desc)}</textarea>
+  </div>
+
+  <div class="hours" role="group" aria-label="Horas">
+    <button data-h="4" aria-pressed="${f.hours===4}"><span class="num">4h</span><span>Meio dia</span></button>
+    <button data-h="8" aria-pressed="${f.hours===8}"><span class="num">8h</span><span>Dia inteiro</span></button>
+  </div>
+
+  ${f.err?`<div class="err" role="alert">${esc(f.err)}</div>`:""}
+  <button class="btn" id="saveEntry">${I.check}${ui.editId?"Guardar alterações":"Guardar registo"}</button>
+  ${ui.editId?`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+    <button class="btn ghost" data-act="cancelEdit">Cancelar</button>
+    <button class="btn danger" id="delEntry">Apagar</button></div>`:""}`;
+}
+function bindReg(){
+  const f = ui.form;
+  $("#goCfg").onclick = () => go("cfg");
+  $("#fDate").onchange = e => { if(e.target.value){ f.date = e.target.value; render(); } };
+  $("#fDesc").oninput = e => f.desc = e.target.value;
+  document.querySelectorAll(".hours button").forEach(b => b.onclick = () => { f.hours = Number(b.dataset.h); document.querySelectorAll(".hours button").forEach(x=>x.setAttribute("aria-pressed", x===b)); });
+  $("#openPicker").onclick = openPicker;
+  $("#saveEntry").onclick = () => {
+    const c = client(f.clientId), p = project(c,f.projectId);
+    if(!c||!p){ f.err = "Escolhe o cliente e o projeto."; render(); return; }
+    f.err = "";
+    if(ui.editId){
+      const e = S.entries.find(x=>x.id===ui.editId);
+      Object.assign(e,{date:f.date,clientId:c.id,projectId:p.id,desc:f.desc.trim(),hours:f.hours}); delete e.sample;
+      ui.editId = null; save(); ui.day = f.date; ui.form = newForm(); go("folha"); toast("Alterações guardadas");
+    } else {
+      S.entries.push({id:uid(),date:f.date,clientId:c.id,projectId:p.id,desc:f.desc.trim(),hours:f.hours,ts:Date.now()});
+      S.last = {clientId:c.id, projectId:p.id}; save();
+      const keepDate = f.date; ui.form = newForm(keepDate); ui.form.hours = f.hours;
+      render(); toast(`Registado: ${fmtH(f.hours)} em ${p.name}`);
+    }
+  };
+  const del = $("#delEntry");
+  if(del){ let armed=false; del.onclick = () => {
+    if(!armed){ armed=true; del.textContent="Confirmar"; return; }
+    const e = S.entries.find(x=>x.id===ui.editId); S.entries = S.entries.filter(x=>x.id!==ui.editId);
+    ui.editId=null; ui.form=newForm(); save(); ui.day = e?.date||ui.day; go("folha"); toast("Registo apagado");
+  }; }
+}
+function editEntry(id){
+  const e = S.entries.find(x=>x.id===id); if(!e) return;
+  ui.editId = id; ui.form = {date:e.date, clientId:e.clientId, projectId:e.projectId, desc:e.desc||"", hours:e.hours, err:""};
+  go("reg");
+}
+
+/* ---------- Lista de escolha ---------- */
+function openPicker(){
+  let q = "";
+  const draw = () => {
+    const f = ui.form, norm = s => s.normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase();
+    const nq = norm(q.trim());
+    const active = S.clients.filter(c=>!c.archived).sort((a,b)=>a.name.localeCompare(b.name,"pt"));
+    const seen = new Set(), rec = [];
+    [...S.entries].sort((a,b)=>b.date.localeCompare(a.date)||(b.ts||0)-(a.ts||0)).forEach(e=>{
+      const k=e.clientId+"|"+e.projectId, c=client(e.clientId), p=project(c,e.projectId);
+      if(seen.has(k)||!c||!p||c.archived||p.archived||rec.length>=4) return; seen.add(k); rec.push({c,p});
+    });
+    const groups = active.map(c=>({c, ps:c.projects.filter(p=>!p.archived && (!nq || norm(p.name).includes(nq) || norm(c.name).includes(nq)))})).filter(g=>g.ps.length);
+    const list = groups.map(g=>`<div class="group"><div class="gh"><span class="dot" style="background:${g.c.color}"></span>${esc(g.c.name)}</div>
+      ${g.ps.map(p=>`<button data-c="${g.c.id}" data-p="${p.id}"><span>${esc(p.name)}</span>${f.projectId===p.id&&f.clientId===g.c.id?`<span style="color:var(--accent)">${I.check}</span>`:""}</button>`).join("")}</div>`).join("");
+    $("#pickScroll").innerHTML = `
+      ${!nq && rec.length ? `<div style="display:flex;flex-direction:column;gap:8px"><span class="lbl">Recentes</span><div class="recents">
+        ${rec.map(r=>`<button data-c="${r.c.id}" data-p="${r.p.id}"><span class="c"><span class="dot" style="width:8px;height:8px;background:${r.c.color}"></span><span>${esc(r.c.name)}</span></span><span class="p">${esc(r.p.name)}</span></button>`).join("")}
+      </div></div><span class="lbl" style="padding-top:6px">Todos</span>` : ""}
+      ${list || `<div class="empty">${active.length ? `Nenhum projeto encontrado para “${esc(q)}”.` : "Ainda não tens clientes nem projetos."}</div>`}`;
+    $("#pickScroll").querySelectorAll("button[data-c]").forEach(b=>b.onclick=()=>{ ui.form.clientId=b.dataset.c; ui.form.projectId=b.dataset.p; ui.form.err=""; close(); render(); });
+  };
+  $("#sheetHost").innerHTML = `<div class="sheet-bg" id="pickBg"><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="pickT">
+    <span class="handle" aria-hidden="true"></span>
+    <div class="row"><h2 id="pickT">Escolher projeto</h2><button class="linkbtn" id="pickClose">Fechar</button></div>
+    <label class="search">${I.search}<span class="sr">Pesquisar</span><input id="pickQ" placeholder="Pesquisar cliente ou projeto" autocomplete="off"></label>
+    <div class="scroll" id="pickScroll"></div>
+    <button class="btn ghost sm" id="pickNew" style="width:100%;border-style:dashed">+ Novo cliente ou projeto</button>
+  </div></div>`;
+  const close = () => $("#sheetHost").innerHTML = "";
+  $("#pickClose").onclick = close;
+  $("#pickBg").onclick = e => { if(e.target.id==="pickBg") close(); };
+  $("#pickQ").oninput = e => { q = e.target.value; draw(); };
+  $("#pickNew").onclick = () => { close(); go("cfg"); };
+  draw();
+}
+
+/* ---------- Folha de horas ---------- */
+function viewFolha(){
+  return `
+  <div class="row">
+    <h1>Folha de horas</h1>
+    <div class="seg" role="group" aria-label="Vista">
+      <button data-f="dia" aria-pressed="${ui.folha==="dia"}">Dia</button>
+      <button data-f="mes" aria-pressed="${ui.folha==="mes"}">Mês</button>
+    </div>
+  </div>
+  ${ui.folha==="dia" ? viewDia() : viewMes()}`;
+}
+function viewDia(){
+  const sel = parse(ui.day), mon = weekMon(sel), list = dayEntries(ui.day), tot = dayHours(ui.day), hol = holidayName(ui.day);
+  const days = [0,1,2,3,4].map(i=>addDays(mon,i));
+  return `
+  <div class="week">
+    <button class="nav" data-wk="-7" aria-label="Semana anterior">${I.chevL}</button>
+    ${days.map(d=>{ const s=iso(d), h=dayHours(s);
+      return `<button class="wd ${h?"has":""} ${holidayName(s)?"hol":""}" data-day="${s}" aria-pressed="${s===ui.day}" aria-label="${DOW[d.getDay()]} ${d.getDate()}, ${fmtH(h)}">
+        <span class="d">${DOWS[d.getDay()]}</span><span class="num">${d.getDate()}</span><span class="bar"><i style="width:${Math.min(100,h/8*100)}%"></i></span></button>`; }).join("")}
+    <button class="nav" data-wk="7" aria-label="Semana seguinte">${I.chevR}</button>
+  </div>
+
+  <div class="row" style="align-items:flex-end">
+    <div style="display:flex;flex-direction:column;gap:2px">
+      <span class="muted" style="font-size:14px">${DOW[sel.getDay()]}, ${sel.getDate()} de ${MON[sel.getMonth()]}${hol?` · ${esc(hol)}`:""}</span>
+      <span class="num big">${fmtH(tot)}</span>
+    </div>
+    <button class="pill" id="copyDay" style="height:40px;border:1px solid var(--line);background:var(--surface)" ${list.length?"":"disabled"}>${I.copy}Copiar dia</button>
+  </div>
+  <div id="copyOut"></div>
+
+  <div style="display:flex;flex-direction:column;gap:10px">
+    ${list.length ? list.map(e=>{ const c=client(e.clientId), p=project(c,e.projectId);
+      return `<button class="card entry" data-edit="${e.id}">
+        <span class="row" style="width:100%"><span class="who"><span class="dot" style="background:${c?.color||"var(--muted)"}"></span><span>${esc(c?.name||"Cliente removido")}</span></span><span class="hpill num ${e.hours===4?"half":""}">${fmtH(e.hours)}</span></span>
+        <span class="proj">${esc(p?.name||"")}</span>
+        ${e.desc?`<span class="desc">${esc(e.desc)}</span>`:""}
+      </button>`; }).join("")
+    : `<div class="empty"><span>Sem registos neste dia.</span><button class="btn sm" data-act="addDay">${I.plus}Registar neste dia</button></div>`}
+  </div>`;
+}
+function viewMes(){
+  const [y,m] = ui.month.split("-").map(Number), first = new Date(y,m-1,1), nDays = new Date(y,m,0).getDate();
+  const lead = (first.getDay()+6)%7, t = today();
+  const inMonth = S.entries.filter(e=>e.date.startsWith(ui.month));
+  const tot = inMonth.reduce((s,e)=>s+e.hours,0);
+  const daysWith = new Set(inMonth.map(e=>e.date)).size;
+  let hols = 0;
+  const cells = [];
+  for(let i=0;i<lead;i++) cells.push(`<span aria-hidden="true"></span>`);
+  for(let d=1; d<=nDays; d++){
+    const s = `${ui.month}-${pad(d)}`, dt = new Date(y,m-1,d), wk = dt.getDay()%6===0, h = dayHours(s), hol = holidayName(s);
+    if(hol && !wk) hols++;
+    let cls = "cd", lab = "";
+    if(h){ cls += h===4 ? " half" : " full"; lab = fmtH(h); }
+    else if(hol){ cls += " hol"; lab = "Fer."; }
+    else if(wk) cls += " weekend";
+    else cls += " work";
+    if(s===t) cls += " today";
+    cells.push(`<button class="${cls}" data-day="${s}" aria-label="${d} de ${MON[m-1]}${h?", "+fmtH(h):""}${hol?", "+hol:""}"><span class="num">${d}</span><small>${lab}</small></button>`);
+  }
+  const byC = {};
+  inMonth.forEach(e=>byC[e.clientId]=(byC[e.clientId]||0)+e.hours);
+  const rows = Object.entries(byC).sort((a,b)=>b[1]-a[1]);
+  return `
+  <div class="card cal-card">
+    <div class="row">
+      <button class="iconbtn sm" data-mo="-1" aria-label="Mês anterior">${I.chevL}</button>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+        <span class="muted" style="font-size:13px">${cap(MON[m-1])} ${y}</span>
+        <span class="num" style="font-size:34px;letter-spacing:-.03em;line-height:1.05">${fmtH(tot)}</span>
+      </div>
+      <button class="iconbtn sm" data-mo="1" aria-label="Mês seguinte">${I.chevR}</button>
+    </div>
+    <div class="cal">${["S","T","Q","Q","S","S","D"].map(h=>`<span class="h">${h}</span>`).join("")}${cells.join("")}</div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:12px">
+    <div class="row muted" style="font-size:13px"><span>Por cliente</span><span>${daysWith} dia${daysWith===1?"":"s"} registado${daysWith===1?"":"s"}${hols?` · ${hols} feriado${hols===1?"":"s"}`:""}</span></div>
+    ${rows.length ? `<div class="split" aria-hidden="true">${rows.map(([id,h])=>`<i style="width:${h/tot*100}%;background:${client(id)?.color||"var(--muted)"}"></i>`).join("")}</div>
+    ${rows.map(([id,h])=>`<div class="row"><span class="who" style="display:flex;align-items:center;gap:8px;font-weight:600;min-width:0"><span class="dot" style="background:${client(id)?.color||"var(--muted)"}"></span>${esc(client(id)?.name||"Cliente removido")}</span><span class="num">${fmtH(h)}</span></div>`).join("")}`
+    : `<div class="muted" style="font-size:14px">Sem horas registadas neste mês.</div>`}
+  </div>`;
+}
+function bindFolha(){
+  document.querySelectorAll("[data-f]").forEach(b=>b.onclick=()=>{ ui.folha=b.dataset.f; if(ui.folha==="mes") ui.month=ui.day.slice(0,7); render(); });
+  document.querySelectorAll("[data-day]").forEach(b=>b.onclick=()=>{ ui.day=b.dataset.day; ui.folha="dia"; render(); });
+  document.querySelectorAll("[data-wk]").forEach(b=>b.onclick=()=>{ ui.day=iso(addDays(weekMon(parse(ui.day)), Number(b.dataset.wk))); render(); });
+  document.querySelectorAll("[data-mo]").forEach(b=>b.onclick=()=>{ const [y,m]=ui.month.split("-").map(Number); const d=new Date(y,m-1+Number(b.dataset.mo),1); ui.month=`${d.getFullYear()}-${pad(d.getMonth()+1)}`; render(); });
+  document.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>editEntry(b.dataset.edit));
+  const cp = $("#copyDay"); if(cp) cp.onclick = () => copyText(dayText(ui.day), "Dia copiado");
+}
+function dayText(s){
+  const d = parse(s), list = dayEntries(s);
+  const lines = [`${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()} (${DOW[d.getDay()]}) — ${fmtH(dayHours(s))}`];
+  list.forEach(e=>{ const c=client(e.clientId), p=project(c,e.projectId);
+    lines.push(`• ${c?.name||""} · ${p?.name||""} — ${fmtH(e.hours)}`); if(e.desc) lines.push(`  ${e.desc.replace(/\n/g,"\n  ")}`); });
+  return lines.join("\n");
+}
+async function copyText(text, ok){
+  try { await navigator.clipboard.writeText(text); toast(ok); }
+  catch(_) { showCopy(text, "Seleciona o texto e copia:"); }
+}
+function showCopy(text, msg){
+  const host = $("#copyOut"); if(!host) return;
+  host.innerHTML = `<div style="display:flex;flex-direction:column;gap:8px"><span class="muted" style="font-size:13px">${esc(msg)}</span><textarea class="copyout" id="copyArea" readonly></textarea></div>`;
+  const ta = $("#copyArea"); ta.value = text; ta.focus(); ta.select();
+}
+
+/* ---------- Clientes e projetos ---------- */
+function viewCfg(){
+  const cfg = ui.cfg, act = S.clients.filter(c=>!c.archived), arch = S.clients.filter(c=>c.archived);
+  const projChip = (c,p) => cfg.proj===p.id
+    ? `<div class="inline" style="width:100%"><label class="sr" for="pName">Nome do projeto</label><input class="field" id="pName" value="${esc(p.name)}">
+        <div class="acts"><button class="btn sm" data-act="pSave" data-c="${c.id}" data-p="${p.id}">Guardar</button>
+        <button class="btn ghost sm" data-act="pArch" data-c="${c.id}" data-p="${p.id}">${p.archived?"Restaurar":"Arquivar"}</button>
+        <button class="linkbtn" data-act="cancel">Cancelar</button></div></div>`
+    : `<button class="pill ${p.archived?"arch":""}" data-act="pEdit" data-p="${p.id}" aria-label="${p.archived?"Projeto arquivado: ":""}${esc(p.name)}, alterar">${esc(p.name)}</button>`;
+  const card = c => cfg.client===c.id ? `
+    <div class="card cl">
+      <div class="inline">
+        <label class="lbl" for="cName">Nome do cliente</label><input class="field" id="cName" value="${esc(c.name)}">
+        <span class="lbl">Cor</span><div class="colors">${COLORS.map(k=>`<button style="background:${k}" data-col="${k}" aria-pressed="${k===(cfg.color||c.color)}" aria-label="Cor ${k}"></button>`).join("")}</div>
+        <div class="acts"><button class="btn sm" data-act="cSave" data-c="${c.id}">Guardar</button>
+        <button class="btn ghost sm" data-act="cArch" data-c="${c.id}">${c.archived?"Restaurar cliente":"Arquivar cliente"}</button>
+        <button class="linkbtn" data-act="cancel">Cancelar</button></div>
+      </div>
+    </div>` : `
+    <div class="card cl" ${c.archived?'style="opacity:.75"':""}>
+      <div class="row"><span class="name"><span class="dot" style="width:12px;height:12px;background:${c.color}"></span>${esc(c.name)}</span>
+        ${c.archived ? `<button class="btn ghost sm" data-act="cArch" data-c="${c.id}">Restaurar</button>` : `<button class="iconbtn sm" data-act="cEdit" data-c="${c.id}" aria-label="Editar ${esc(c.name)}">${I.pen}</button>`}</div>
+      ${c.archived ? "" : `<div class="chips">
+        ${[...c.projects.filter(p=>!p.archived), ...c.projects.filter(p=>p.archived)].map(p=>projChip(c,p)).join("")}
+        ${cfg.newProj===c.id ? `<div class="inline" style="width:100%"><label class="sr" for="npName">Nome do novo projeto</label><input class="field" id="npName" placeholder="Nome do projeto">
+          <div class="acts"><button class="btn sm" data-act="pAdd" data-c="${c.id}">Adicionar</button><button class="linkbtn" data-act="cancel">Cancelar</button></div></div>`
+        : `<button class="pill add" data-act="pNew" data-c="${c.id}">+ Projeto</button>`}
+      </div>`}
+    </div>`;
+  return `
+  <div style="display:flex;align-items:center;gap:12px">
+    <button class="iconbtn" id="cfgBack" aria-label="Voltar">${I.chevL}</button>
+    <h1 style="font-size:24px">Clientes e projetos</h1>
+  </div>
+  ${hasSample()?`<div class="banner"><span>Os clientes e registos que vês são exemplos.</span><button class="linkbtn" data-act="clearSample">Apagar exemplos</button></div>`:""}
+  ${act.map(card).join("") || `<div class="empty">Ainda não tens clientes. Cria o primeiro para começares a registar horas.</div>`}
+  ${cfg.newClient ? `<div class="card cl"><div class="inline">
+      <label class="lbl" for="ncName">Novo cliente</label><input class="field" id="ncName" placeholder="Nome do cliente">
+      <label class="lbl" for="ncProj">Primeiro projeto</label><input class="field" id="ncProj" placeholder="Nome do projeto">
+      ${cfg.err?`<div class="err" role="alert">${esc(cfg.err)}</div>`:""}
+      <div class="acts"><button class="btn sm" data-act="cAdd">Criar cliente</button><button class="linkbtn" data-act="cancel">Cancelar</button></div>
+    </div></div>`
+  : `<button class="btn" data-act="cNew">${I.plus}Novo cliente</button>`}
+  ${arch.length?`<div class="lbl" style="padding-top:8px">Arquivados</div>${arch.map(card).join("")}`:""}
+
+  <div style="display:flex;flex-direction:column;gap:10px;padding-top:10px;border-top:1px solid var(--line-soft)">
+    <h2 style="font-size:18px;padding-top:12px">Cópia de segurança</h2>
+    <p class="muted" style="margin:0;font-size:14px">Os registos ficam guardados só neste telemóvel, dentro do browser. Se limpares os dados do browser perdes tudo, por isso guarda uma cópia de vez em quando.</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <button class="btn ghost sm" data-act="bkExport">Guardar cópia</button>
+      <button class="btn ghost sm" data-act="bkImport">Restaurar cópia</button>
+    </div>
+    <div id="copyOut"></div>
+  </div>`;
+}
+function bindCfg(){
+  $("#cfgBack").onclick = () => go(ui.back||"reg");
+  document.querySelectorAll("[data-col]").forEach(b=>b.onclick=()=>{ ui.cfg.color=b.dataset.col; ui.cfg.name=$("#cName").value; render(); $("#cName").value=ui.cfg.name; });
+  const focus = id => setTimeout(()=>{ const el=$(id); if(el){ el.focus(); } },30);
+  if(ui.cfg.newClient) focus("#ncName"); if(ui.cfg.newProj) focus("#npName");
+}
+function cfgAct(a, ds){
+  const c = client(ds.c);
+  switch(a){
+    case "cancel": ui.cfg={}; break;
+    case "cNew": ui.cfg={newClient:true}; break;
+    case "cAdd": {
+      const n=$("#ncName").value.trim(), pn=$("#ncProj").value.trim();
+      if(!n){ ui.cfg={newClient:true,err:"Escreve o nome do cliente."}; break; }
+      if(S.clients.some(x=>x.name.toLowerCase()===n.toLowerCase())){ ui.cfg={newClient:true,err:"Já existe um cliente com esse nome."}; break; }
+      const used = S.clients.map(x=>x.color), color = COLORS.find(k=>!used.includes(k)) || COLORS[S.clients.length%COLORS.length];
+      const nc = {id:uid(),name:n,color,archived:false,projects:pn?[{id:uid(),name:pn,archived:false}]:[]};
+      S.clients.push(nc); save(); ui.cfg = pn?{}:{newProj:nc.id}; toast(`Cliente “${n}” criado`); break; }
+    case "cEdit": ui.cfg={client:ds.c}; break;
+    case "cSave": { const n=$("#cName").value.trim(); if(n){ c.name=n; } if(ui.cfg.color) c.color=ui.cfg.color; delete c.sample; save(); ui.cfg={}; toast("Cliente atualizado"); break; }
+    case "cArch": c.archived=!c.archived; save(); ui.cfg={}; toast(c.archived?"Cliente arquivado":"Cliente restaurado"); break;
+    case "pNew": ui.cfg={newProj:ds.c}; break;
+    case "pAdd": { const n=$("#npName").value.trim(); if(!n){ $("#npName").focus(); return; } c.projects.push({id:uid(),name:n,archived:false}); save(); ui.cfg={}; toast(`Projeto “${n}” adicionado`); break; }
+    case "pEdit": ui.cfg={proj:ds.p}; break;
+    case "pSave": { const p=project(c,ds.p), n=$("#pName").value.trim(); if(n) p.name=n; save(); ui.cfg={}; toast("Projeto atualizado"); break; }
+    case "pArch": { const p=project(c,ds.p); p.archived=!p.archived; save(); ui.cfg={}; toast(p.archived?"Projeto arquivado":"Projeto restaurado"); break; }
+    case "bkExport": exportBackup(); return;
+    case "bkImport": $("#importFile").click(); return;
+  }
+  render();
+}
+async function exportBackup(){
+  const data = JSON.stringify(S, null, 2), name = `folha-horas-copia_${today()}.json`;
+  const blob = new Blob([data], {type:"application/json"});
+  try {
+    const file = new File([blob], name, {type:"application/json"});
+    if (navigator.canShare && navigator.canShare({files:[file]})) { await navigator.share({files:[file], title:"Cópia da Folha de Horas"}); toast("Cópia pronta"); return; }
+  } catch(err) { if (err && err.name === "AbortError") return; }
+  try {
+    const url = URL.createObjectURL(blob), a = document.createElement("a");
+    a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 4000); toast("Cópia guardada nas transferências"); return;
+  } catch(_) {}
+  showCopy(data, "Não foi possível guardar o ficheiro. Copia este texto para um local seguro:");
+}
+$("#importFile").addEventListener("change", ev => {
+  const file = ev.target.files[0]; if(!file) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const s = JSON.parse(r.result);
+      if(!s || !Array.isArray(s.clients) || !Array.isArray(s.entries)) throw 0;
+      S = {clients:s.clients, entries:s.entries.filter(e=>e&&e.date&&e.clientId&&e.hours), last:s.last||null};
+      save(); ui.form=newForm(); ui.cfg={}; render(); toast(`Cópia restaurada: ${S.entries.length} registos`);
+    } catch(_) { toast("Esse ficheiro não é uma cópia da Folha de Horas."); }
+    ev.target.value = "";
+  };
+  r.readAsText(file);
+});
+
+/* ---------- Ações gerais e navegação ---------- */
+function clearSample(){
+  const ids = new Set(S.clients.filter(c=>c.sample).map(c=>c.id));
+  S.clients = S.clients.filter(c=>!c.sample);
+  S.entries = S.entries.filter(e=>!e.sample && !ids.has(e.clientId));
+  if(S.last && ids.has(S.last.clientId)) S.last = null;
+  save(); ui.form = newForm(); render(); toast("Exemplos apagados");
+}
+document.addEventListener("click", ev => {
+  const b = ev.target.closest("[data-act]"); if(!b) return;
+  const a = b.dataset.act;
+  if(a==="clearSample") return clearSample();
+  if(a==="cancelEdit"){ ui.editId=null; ui.form=newForm(); return go("folha"); }
+  if(a==="addDay"){ ui.editId=null; ui.form=newForm(ui.day); return go("reg"); }
+  cfgAct(a, b.dataset);
+});
+function go(v){
+  if(v==="cfg" && ui.view!=="cfg") ui.back = ui.view;
+  if(v!=="reg" && ui.editId && v!=="cfg"){ ui.editId=null; ui.form=newForm(); }
+  ui.view = v; ui.cfg = v==="cfg" ? ui.cfg : {}; render(); window.scrollTo(0,0);
+}
+$("#navReg").onclick = () => { if(ui.editId){ ui.editId=null; ui.form=newForm(); } go("reg"); };
+$("#navFolha").onclick = () => go("folha");
+function render(){
+  const app = $("#app");
+  if(ui.view==="reg"){ app.innerHTML = viewReg(); bindReg(); }
+  else if(ui.view==="folha"){ app.innerHTML = viewFolha(); bindFolha(); }
+  else { app.innerHTML = viewCfg(); bindCfg(); }
+  $("#navReg").toggleAttribute("aria-current", ui.view==="reg"); if(ui.view==="reg") $("#navReg").setAttribute("aria-current","page");
+  $("#navFolha").toggleAttribute("aria-current", ui.view==="folha"); if(ui.view==="folha") $("#navFolha").setAttribute("aria-current","page");
+}
+render();
+if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(()=>{});
+if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(()=>{}));
+})();
+</script>
+</body>
+</html>

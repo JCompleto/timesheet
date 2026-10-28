@@ -1,6 +1,6 @@
 // Guarda a app no telemóvel para abrir sem internet.
 // Ao publicar uma nova versão, muda o número abaixo.
-const VERSION = "folha-horas-v2";
+const VERSION = "folha-horas-v3";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icons/icon.svg", "./icons/icon-192.png", "./icons/apple-touch-icon.png"];
 
 self.addEventListener("install", e => {
@@ -15,7 +15,7 @@ self.addEventListener("fetch", e => {
   const url = new URL(req.url);
   // Página: tenta a rede primeiro (para receber atualizações), usa a cópia se estiver offline.
   if (req.mode === "navigate") {
-    e.respondWith(fetch(req).then(r => { const copy = r.clone(); caches.open(VERSION).then(c => c.put("./index.html", copy)); return r; })
+    e.respondWith(fetch(req.url, {cache: "no-cache"}).then(r => { const copy = r.clone(); caches.open(VERSION).then(c => c.put("./index.html", copy)); return r; })
       .catch(() => caches.match("./index.html")));
     return;
   }

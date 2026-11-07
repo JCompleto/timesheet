@@ -209,6 +209,7 @@ const I = {
   copy:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8"/></svg>',
   pen:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>',
   cal:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="4" y="5" width="16" height="16" rx="3"/><path d="M8 3v4M16 3v4M4 10h16"/></svg>',
+  xls:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 12l6 6M15 12l-6 6"/></svg>',
   plus:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>'
 };
 
@@ -489,6 +490,7 @@ function viewMes(){
     <div class="row muted" style="font-size:13px"><span>${cap(MON[m-1])} por cliente</span><span class="num" style="font-size:13px">${fmtH(tot)}</span></div>
     <div class="split" aria-hidden="true">${rows.map(([id,h])=>`<i style="width:${h/tot*100}%;background:${client(id)?.color||"var(--muted)"}"></i>`).join("")}</div>
     ${rows.map(([id,h])=>`<div class="row"><span class="who" style="display:flex;align-items:center;gap:8px;font-weight:600;min-width:0"><span class="dot" style="background:${client(id)?.color||"var(--muted)"}"></span>${esc(client(id)?.name||"Cliente removido")}</span><span class="num">${fmtH(h)}</span></div>`).join("")}
+    <button class="btn ghost" id="xlsMes" style="margin-top:6px">${I.xls}Exportar ${MON[m-1]} para Excel</button>
   </div>` : ""}`;
 }
 function pickDay(month){
@@ -515,6 +517,73 @@ function bindFolha(){
   }
   document.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>editEntry(b.dataset.edit));
   const cp = $("#copyDay"); if(cp) cp.onclick = () => copyText(dayText(ui.day), "Dia copiado");
+  const xb = $("#xlsMes"); if(xb) xb.onclick = () => exportMonthXlsx(ui.month);
+}
+/* ---------- Exportar mês para Excel (.xlsx gerado no telemóvel, sem bibliotecas) ---------- */
+const CRC = (()=>{ const t=new Uint32Array(256); for(let n=0;n<256;n++){ let c=n; for(let k=0;k<8;k++) c = c&1 ? 0xEDB88320^(c>>>1) : c>>>1; t[n]=c>>>0; } return t; })();
+function crc32(b){ let c=0xFFFFFFFF; for(let i=0;i<b.length;i++) c = CRC[(c^b[i])&255]^(c>>>8); return (c^0xFFFFFFFF)>>>0; }
+function zip(files){
+  const enc=new TextEncoder(), parts=[], cen=[]; let off=0;
+  const u16=n=>[n&255,(n>>>8)&255], u32=n=>[n&255,(n>>>8)&255,(n>>>16)&255,(n>>>24)&255];
+  for(const [name,text] of files){
+    const nb=enc.encode(name), data=enc.encode(text), crc=crc32(data);
+    const head=[...u32(0x04034b50),...u16(20),...u16(0x0800),...u16(0),...u16(0),...u16(0x21),...u32(crc),...u32(data.length),...u32(data.length),...u16(nb.length),...u16(0)];
+    parts.push(new Uint8Array(head), nb, data);
+    cen.push(new Uint8Array([...u32(0x02014b50),...u16(20),...u16(20),...u16(0x0800),...u16(0),...u16(0),...u16(0x21),...u32(crc),...u32(data.length),...u32(data.length),...u16(nb.length),...u16(0),...u16(0),...u16(0),...u16(0),...u32(0),...u32(off)]), nb);
+    off += head.length + nb.length + data.length;
+  }
+  const csize = cen.reduce((s,a)=>s+a.length,0);
+  return new Blob([...parts,...cen,new Uint8Array([...u32(0x06054b50),...u16(0),...u16(0),...u16(files.length),...u16(files.length),...u32(csize),...u32(off),...u16(0)])],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+}
+const xe = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,"");
+function sheetXml(rows, widths){
+  const col = i => String.fromCharCode(65+i);
+  const cell = (v,r,i) => { const ref=col(i)+r;
+    if(v && typeof v==="object"){ if(v.d!==undefined) return `<c r="${ref}" s="2"><v>${v.d}</v></c>`; if(v.f) return `<c r="${ref}" s="${v.s||0}"><f>${xe(v.f)}</f></c>`; if(v.b!==undefined) return typeof v.b==="number" ? `<c r="${ref}" s="1"><v>${v.b}</v></c>` : `<c r="${ref}" s="1" t="inlineStr"><is><t xml:space="preserve">${xe(v.b)}</t></is></c>`; }
+    if(typeof v==="number") return `<c r="${ref}"><v>${v}</v></c>`;
+    if(v===null||v===undefined||v==="") return "";
+    return `<c r="${ref}" t="inlineStr"><is><t xml:space="preserve">${xe(v)}</t></is></c>`; };
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols>${widths.map((w,i)=>`<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join("")}</cols><sheetData>${rows.map((r,ri)=>`<row r="${ri+1}">${r.map((v,i)=>cell(v,ri+1,i)).join("")}</row>`).join("")}</sheetData></worksheet>`;
+}
+function exportMonthXlsx(month){
+  const [y,m] = month.split("-").map(Number);
+  const list = S.entries.filter(e=>e.date.startsWith(month)).sort((a,b)=>a.date.localeCompare(b.date)||(a.ts||0)-(b.ts||0));
+  if(!list.length){ toast("Sem registos neste mês."); return; }
+  const serial = s => Math.round((Date.UTC(...s.split("-").map((v,i)=>i===1?v-1:+v)) - Date.UTC(1899,11,30))/86400000);
+  const B = v => ({b:v});
+  const r1 = [[B("Data"),B("Dia"),B("Cliente"),B("Projeto"),B("Descrição"),B("Horas")]];
+  list.forEach(e=>{ const c=client(e.clientId), p=project(c,e.projectId);
+    r1.push([{d:serial(e.date)}, DOW[parse(e.date).getDay()], c?.name||"Cliente removido", p?.name||"", e.desc||"", e.hours]); });
+  r1.push([], [B("Total"),"","","","",{f:`SUM(F2:F${list.length+1})`,s:1}]);
+  const byP = {};
+  list.forEach(e=>{ const k=e.clientId+"|"+e.projectId; byP[k]=(byP[k]||0)+e.hours; });
+  const r2 = [[B("Cliente"),B("Projeto"),B("Horas"),B("Dias (8h)")]];
+  Object.entries(byP).sort((a,b)=>{ const ca=client(a[0].split("|")[0])?.name||"", cb=client(b[0].split("|")[0])?.name||""; return ca.localeCompare(cb)||b[1]-a[1]; }).forEach(([k,h])=>{
+    const [cid,pid]=k.split("|"), c=client(cid), p=project(c,pid); r2.push([c?.name||"Cliente removido", p?.name||"", h, h/8]); });
+  const n2 = r2.length;
+  r2.push([], [B("Total"),"",{f:`SUM(C2:C${n2})`,s:1},{f:`SUM(D2:D${n2})`,s:1}]);
+  const title = `${cap(MON[m-1])} ${y}`;
+  const files = [
+    ["[Content_Types].xml",`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`],
+    ["_rels/.rels",`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`],
+    ["xl/workbook.xml",`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Registos" sheetId="1" r:id="rId1"/><sheet name="Por projeto" sheetId="2" r:id="rId2"/></sheets></workbook>`],
+    ["xl/_rels/workbook.xml.rels",`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`],
+    ["xl/styles.xml",`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="dd/mm/yyyy"/></numFmts><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`],
+    ["xl/worksheets/sheet1.xml", sheetXml(r1,[12,10,24,24,50,8])],
+    ["xl/worksheets/sheet2.xml", sheetXml(r2,[24,28,10,10])]
+  ];
+  shareFile(zip(files), `Folha de horas ${title}.xlsx`, `Excel de ${title} pronto`);
+}
+async function shareFile(blob, name, ok){
+  try {
+    const file = new File([blob], name, {type:blob.type});
+    if (navigator.canShare && navigator.canShare({files:[file]})) { await navigator.share({files:[file], title:name}); toast(ok); return; }
+  } catch(err) { if (err && err.name === "AbortError") return; }
+  try {
+    const url = URL.createObjectURL(blob), a = document.createElement("a");
+    a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 4000); toast("Ficheiro guardado nas transferências");
+  } catch(_) { toast("Não foi possível criar o ficheiro."); }
 }
 function dayText(s){
   const d = parse(s), list = dayEntries(s);

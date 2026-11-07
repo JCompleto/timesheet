@@ -106,20 +106,30 @@ textarea.field{min-height:88px;resize:vertical;line-height:1.45}
 .entry .proj{font-size:13px;color:var(--muted);font-weight:500}
 .entry .desc{font-size:15px;color:var(--fg-2);overflow-wrap:anywhere;white-space:pre-line}
 .empty{text-align:center;color:var(--muted);padding:28px 16px;display:flex;flex-direction:column;gap:12px;align-items:center}
-.cal-card{padding:16px 14px 18px;display:flex;flex-direction:column;gap:14px;border-radius:24px}
-.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
-.cal .h{text-align:center;font-size:11px;font-weight:600;color:var(--muted)}
-.cd{height:48px;border-radius:14px;border:1px solid transparent;background:transparent;color:var(--fg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:0}
-.cd .num{font-size:14px}
-.cd small{font-size:10px;font-weight:600;line-height:1.1}
-.cd.work{border-color:var(--line-soft);color:var(--muted)}
-.cd.weekend{color:var(--dim)}
+.cal-card{padding:14px 12px 16px;display:flex;flex-direction:column;gap:12px;border-radius:24px;touch-action:pan-y}
+.cal-head{display:flex;align-items:center;gap:6px}
+.cal-head .mt{flex-grow:1;display:flex;flex-direction:column;gap:1px;padding-left:6px;min-width:0}
+.cal-head .mt b{font-family:var(--display);font-size:20px;letter-spacing:-.02em}
+.cal-head .mt span{font-size:13px;color:var(--muted)}
+.todaybtn{height:34px;padding:0 12px;border-radius:99px;border:1px solid var(--line);background:transparent;color:var(--accent-text);font-size:13px;font-weight:600}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.cal .h{text-align:center;font-size:11px;font-weight:600;color:var(--muted);padding-bottom:2px}
+.cd{height:54px;border-radius:16px;border:1.5px solid transparent;background:transparent;color:var(--fg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:0;transition:background .15s}
+.cd .num{font-size:15px;font-weight:600}
+.cd small{font-size:10px;font-weight:600;line-height:1;color:var(--muted);height:10px}
+.cd.weekend .num{color:var(--dim)}
+.cd.hol .num{color:var(--muted)}
 .cd.full{background:var(--accent-soft)}
 .cd.full small{color:var(--accent-text)}
 .cd.half{background:var(--half-soft)}
 .cd.half small{color:var(--half)}
-.cd.hol{border-color:var(--line-soft);color:var(--muted)}
 .cd.today{border-color:var(--accent)}
+.cd[aria-pressed="true"]{background:var(--fg);border-color:var(--fg);color:var(--bg)}
+.cd[aria-pressed="true"] .num,.cd[aria-pressed="true"] small{color:var(--bg)}
+.cal-anim{animation:calin .18s ease-out}
+@keyframes calin{from{opacity:.3;transform:translateX(var(--dx,0))}}
+.dayhead{display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
+.dayhead .t{display:flex;flex-direction:column;gap:2px;min-width:0}
 .split{height:10px;border-radius:99px;display:flex;gap:3px;overflow:hidden}
 .split i{display:block;height:100%;border-radius:99px}
 
@@ -419,63 +429,90 @@ function viewDia(){
   </div>
   <div id="copyOut"></div>
 
-  <div style="display:flex;flex-direction:column;gap:10px">
-    ${list.length ? list.map(e=>{ const c=client(e.clientId), p=project(c,e.projectId);
+  <div style="display:flex;flex-direction:column;gap:10px">${dayList(ui.day)}</div>`;
+}
+function dayList(s){
+  const list = dayEntries(s);
+  return list.length ? list.map(e=>{ const c=client(e.clientId), p=project(c,e.projectId);
       return `<button class="card entry" data-edit="${e.id}">
         <span class="row" style="width:100%"><span class="who"><span class="dot" style="background:${c?.color||"var(--muted)"}"></span><span>${esc(c?.name||"Cliente removido")}</span></span><span class="hpill num ${e.hours===4?"half":""}">${fmtH(e.hours)}</span></span>
         <span class="proj">${esc(p?.name||"")}</span>
         ${e.desc?`<span class="desc">${esc(e.desc)}</span>`:""}
       </button>`; }).join("")
-    : `<div class="empty"><span>Sem registos neste dia.</span><button class="btn sm" data-act="addDay">${I.plus}Registar neste dia</button></div>`}
-  </div>`;
+    : `<div class="empty"><span>Sem registos neste dia.</span><button class="btn sm" data-act="addDay">${I.plus}Registar neste dia</button></div>`;
 }
 function viewMes(){
   const [y,m] = ui.month.split("-").map(Number), first = new Date(y,m-1,1), nDays = new Date(y,m,0).getDate();
   const lead = (first.getDay()+6)%7, t = today();
+  if(!ui.day.startsWith(ui.month)) ui.day = pickDay(ui.month);
   const inMonth = S.entries.filter(e=>e.date.startsWith(ui.month));
   const tot = inMonth.reduce((s,e)=>s+e.hours,0);
   const daysWith = new Set(inMonth.map(e=>e.date)).size;
-  let hols = 0;
   const cells = [];
   for(let i=0;i<lead;i++) cells.push(`<span aria-hidden="true"></span>`);
   for(let d=1; d<=nDays; d++){
     const s = `${ui.month}-${pad(d)}`, dt = new Date(y,m-1,d), wk = dt.getDay()%6===0, h = dayHours(s), hol = holidayName(s);
-    if(hol && !wk) hols++;
     let cls = "cd", lab = "";
-    if(h){ cls += h===4 ? " half" : " full"; lab = fmtH(h); }
+    if(h){ cls += h<8 ? " half" : " full"; lab = fmtH(h); }
     else if(hol){ cls += " hol"; lab = "Fer."; }
     else if(wk) cls += " weekend";
-    else cls += " work";
     if(s===t) cls += " today";
-    cells.push(`<button class="${cls}" data-day="${s}" aria-label="${d} de ${MON[m-1]}${h?", "+fmtH(h):""}${hol?", "+hol:""}"><span class="num">${d}</span><small>${lab}</small></button>`);
+    cells.push(`<button class="${cls}" data-pick="${s}" aria-pressed="${s===ui.day}" aria-label="${d} de ${MON[m-1]}${h?", "+fmtH(h):""}${hol?", "+hol:""}"><span class="num">${d}</span><small>${lab}</small></button>`);
   }
+  const sel = parse(ui.day), dh = dayHours(ui.day), hol = holidayName(ui.day), list = dayEntries(ui.day);
   const byC = {};
   inMonth.forEach(e=>byC[e.clientId]=(byC[e.clientId]||0)+e.hours);
   const rows = Object.entries(byC).sort((a,b)=>b[1]-a[1]);
+  const showToday = ui.day!==t;
   return `
-  <div class="card cal-card">
-    <div class="row">
+  <div class="card cal-card" id="calCard">
+    <div class="cal-head">
+      <div class="mt"><b>${cap(MON[m-1])} ${y}</b><span>${fmtH(tot)} · ${daysWith} dia${daysWith===1?"":"s"}</span></div>
+      ${showToday?`<button class="todaybtn" id="goToday">Hoje</button>`:""}
       <button class="iconbtn sm" data-mo="-1" aria-label="Mês anterior">${I.chevL}</button>
-      <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
-        <span class="muted" style="font-size:13px">${cap(MON[m-1])} ${y}</span>
-        <span class="num" style="font-size:34px;letter-spacing:-.03em;line-height:1.05">${fmtH(tot)}</span>
-      </div>
       <button class="iconbtn sm" data-mo="1" aria-label="Mês seguinte">${I.chevR}</button>
     </div>
-    <div class="cal">${["S","T","Q","Q","S","S","D"].map(h=>`<span class="h">${h}</span>`).join("")}${cells.join("")}</div>
+    <div class="cal ${ui.anim?"cal-anim":""}" style="--dx:${ui.anim||0}px">${["S","T","Q","Q","S","S","D"].map(h=>`<span class="h">${h}</span>`).join("")}${cells.join("")}</div>
   </div>
-  <div style="display:flex;flex-direction:column;gap:12px">
-    <div class="row muted" style="font-size:13px"><span>Por cliente</span><span>${daysWith} dia${daysWith===1?"":"s"} registado${daysWith===1?"":"s"}${hols?` · ${hols} feriado${hols===1?"":"s"}`:""}</span></div>
-    ${rows.length ? `<div class="split" aria-hidden="true">${rows.map(([id,h])=>`<i style="width:${h/tot*100}%;background:${client(id)?.color||"var(--muted)"}"></i>`).join("")}</div>
-    ${rows.map(([id,h])=>`<div class="row"><span class="who" style="display:flex;align-items:center;gap:8px;font-weight:600;min-width:0"><span class="dot" style="background:${client(id)?.color||"var(--muted)"}"></span>${esc(client(id)?.name||"Cliente removido")}</span><span class="num">${fmtH(h)}</span></div>`).join("")}`
-    : `<div class="muted" style="font-size:14px">Sem horas registadas neste mês.</div>`}
-  </div>`;
+
+  <div class="dayhead">
+    <div class="t">
+      <span class="muted" style="font-size:14px">${DOW[sel.getDay()]}, ${sel.getDate()} de ${MON[sel.getMonth()]}${hol?` · ${esc(hol)}`:""}</span>
+      <span class="num" style="font-size:30px;letter-spacing:-.03em;line-height:1.05">${fmtH(dh)}</span>
+    </div>
+    ${list.length?`<button class="pill" id="copyDay" style="height:40px;border:1px solid var(--line);background:var(--surface)">${I.copy}Copiar dia</button>`:""}
+  </div>
+  <div id="copyOut"></div>
+  <div style="display:flex;flex-direction:column;gap:10px">${dayList(ui.day)}</div>
+
+  ${rows.length ? `<div style="display:flex;flex-direction:column;gap:12px;margin-top:6px">
+    <div class="row muted" style="font-size:13px"><span>${cap(MON[m-1])} por cliente</span><span class="num" style="font-size:13px">${fmtH(tot)}</span></div>
+    <div class="split" aria-hidden="true">${rows.map(([id,h])=>`<i style="width:${h/tot*100}%;background:${client(id)?.color||"var(--muted)"}"></i>`).join("")}</div>
+    ${rows.map(([id,h])=>`<div class="row"><span class="who" style="display:flex;align-items:center;gap:8px;font-weight:600;min-width:0"><span class="dot" style="background:${client(id)?.color||"var(--muted)"}"></span>${esc(client(id)?.name||"Cliente removido")}</span><span class="num">${fmtH(h)}</span></div>`).join("")}
+  </div>` : ""}`;
+}
+function pickDay(month){
+  const t = today(); if(t.startsWith(month)) return t;
+  for(let d=1; d<=7; d++){ const s=`${month}-${pad(d)}`, w=parse(s).getDay(); if(w%6!==0 && !holidayName(s)) return s; }
+  return `${month}-01`;
+}
+function moveMonth(n){
+  const [y,m]=ui.month.split("-").map(Number); const d=new Date(y,m-1+n,1);
+  ui.month=`${d.getFullYear()}-${pad(d.getMonth()+1)}`; ui.day=pickDay(ui.month); ui.anim = n>0?40:-40; render(); ui.anim=0;
 }
 function bindFolha(){
   document.querySelectorAll("[data-f]").forEach(b=>b.onclick=()=>{ ui.folha=b.dataset.f; if(ui.folha==="mes") ui.month=ui.day.slice(0,7); render(); });
-  document.querySelectorAll("[data-day]").forEach(b=>b.onclick=()=>{ ui.day=b.dataset.day; ui.folha="dia"; render(); });
+  document.querySelectorAll("[data-day]").forEach(b=>b.onclick=()=>{ ui.day=b.dataset.day; render(); });
+  document.querySelectorAll("[data-pick]").forEach(b=>b.onclick=()=>{ ui.day=b.dataset.pick; render(); });
   document.querySelectorAll("[data-wk]").forEach(b=>b.onclick=()=>{ ui.day=iso(addDays(weekMon(parse(ui.day)), Number(b.dataset.wk))); render(); });
-  document.querySelectorAll("[data-mo]").forEach(b=>b.onclick=()=>{ const [y,m]=ui.month.split("-").map(Number); const d=new Date(y,m-1+Number(b.dataset.mo),1); ui.month=`${d.getFullYear()}-${pad(d.getMonth()+1)}`; render(); });
+  document.querySelectorAll("[data-mo]").forEach(b=>b.onclick=()=>moveMonth(Number(b.dataset.mo)));
+  const gt = $("#goToday"); if(gt) gt.onclick = () => { ui.day=today(); ui.month=ui.day.slice(0,7); render(); };
+  const cc = $("#calCard");
+  if(cc){ let x0=null,y0=null;
+    cc.addEventListener("touchstart",e=>{ x0=e.touches[0].clientX; y0=e.touches[0].clientY; },{passive:true});
+    cc.addEventListener("touchend",e=>{ if(x0===null) return; const dx=e.changedTouches[0].clientX-x0, dy=e.changedTouches[0].clientY-y0; x0=null;
+      if(Math.abs(dx)>50 && Math.abs(dx)>Math.abs(dy)*1.5) moveMonth(dx<0?1:-1); },{passive:true});
+  }
   document.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>editEntry(b.dataset.edit));
   const cp = $("#copyDay"); if(cp) cp.onclick = () => copyText(dayText(ui.day), "Dia copiado");
 }
